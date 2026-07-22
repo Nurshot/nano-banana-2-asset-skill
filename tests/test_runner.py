@@ -113,7 +113,8 @@ print(output)
     def args(self, agy: Path, output: Path, **overrides):
         values = dict(prompt="a detailed image", prompt_file=None, reference=[], output=str(output), ratio="4:3",
                       target_width=None, target_height=None, overwrite=False, agy=str(agy), print_timeout="5m",
-                      process_timeout=2, artifact_root=[], project_root=str(self.root))
+                      process_timeout=2, artifact_root=[], project_root=str(self.root),
+                      runtime_state_dir=str(self.root / "runtime-state"), slot_wait_timeout=2)
         values.update(overrides)
         return argparse.Namespace(**values)
 
@@ -155,12 +156,18 @@ print(output)
         self.assertEqual(error.payload()["error_type"], "rate_limit")
         self.assertFalse(output.exists())
 
+        with self.assertRaises(runner.RateLimitError) as cached:
+            runner.generate(self.args(self.fake_agy("success"), self.root / "blocked-by-cooldown.png"))
+        self.assertGreater(cached.exception.retry_after_seconds, 10790)
+        self.assertFalse((self.root / "blocked-by-cooldown.png").exists())
+
     def test_cli_rate_limit_json_and_temporary_failure_exit_code(self):
         output = self.root / "quota-cli.png"
         process = subprocess.run(
             [sys.executable, str(RUNNER_PATH), "generate", "--prompt", "test image",
              "--output", str(output), "--project-root", str(self.root),
-             "--agy", str(self.fake_agy("quota-zero"))],
+             "--agy", str(self.fake_agy("quota-zero")),
+             "--runtime-state-dir", str(self.root / "cli-runtime-state")],
             capture_output=True,
             text=True,
             check=False,
@@ -180,6 +187,31 @@ print(output)
     def test_retry_hint_parser_supports_compound_and_short_units(self):
         self.assertEqual(runner.parse_retry_after_seconds("retry after 2h 15m")[0], 8100)
         self.assertEqual(runner.parse_retry_after_seconds("resets in 45 seconds")[0], 45)
+        self.assertEqual(runner.parse_retry_after_seconds("resets in ~4 hours")[0], 14400)
+
+    def test_runtime_cooldown_uses_dynamic_duration_and_expires(self):
+        state = self.root / "cooldown-state"
+        error = runner.RateLimitError("limited", retry_after_seconds=14400, model="gemini-3.1-flash-image")
+        runner.record_rate_limit(state, error, now=1000)
+        active = runner.active_rate_limit(state, now=1001)
+        self.assertEqual(active.retry_after_seconds, 14399)
+        self.assertIsNone(runner.active_rate_limit(state, now=15401))
+
+    def test_rate_limit_without_reset_hint_gets_short_protective_backoff(self):
+        state = self.root / "unknown-reset-state"
+        runner.record_rate_limit(state, runner.RateLimitError("limited"), now=1000)
+        self.assertEqual(runner.active_rate_limit(state, now=1001).retry_after_seconds, 59)
+
+    def test_runner_allows_only_two_generation_slots(self):
+        state = self.root / "slot-state"
+        first = runner.acquire_generation_slot(state, wait_timeout=0)
+        second = runner.acquire_generation_slot(state, wait_timeout=0)
+        try:
+            with self.assertRaisesRegex(runner.AssetError, "Two image generations"):
+                runner.acquire_generation_slot(state, wait_timeout=0)
+        finally:
+            runner.release_generation_slot(first)
+            runner.release_generation_slot(second)
 
     def test_headless_permission_error_is_actionable_and_safe(self):
         with self.assertRaisesRegex(runner.AssetError, "narrow command allow-rule"):

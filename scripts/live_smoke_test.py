@@ -26,7 +26,8 @@ def args_for(kind: str, output: Path) -> argparse.Namespace:
     size = (1600, 900) if kind == "web" else (900, 1200)
     return argparse.Namespace(prompt=PROMPTS[kind], prompt_file=None, output=str(output), reference=[], ratio="1:1",
                               target_width=size[0], target_height=size[1], overwrite=False, agy="agy",
-                              print_timeout="5m", process_timeout=330, artifact_root=[], project_root=str(ROOT))
+                              print_timeout="5m", process_timeout=330, artifact_root=[], project_root=str(ROOT),
+                              runtime_state_dir=None, slot_wait_timeout=330)
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -44,6 +44,8 @@ The helper invokes `agy --print --print-timeout 5m` without a shell. It assigns 
 
 If generation fails or no artifact can be found, do not alter application code. Report the error and preserve the existing UI. If the real image dimensions are below the requested slot, integrate it only when still useful and clearly warn the user; do not claim that it is 2K/4K and do not fake an upscale.
 
+For multiple images, submit at most two generations at a time and wait for both to finish before starting the next pair. The runner enforces this across processes. On any `rate_limit` response, stop the remaining batch; respect its dynamic reset time (which may be hours or weekly), do not retry during the recorded cooldown, and direct the user to Agy `/usage` or `/quota`.
+
 ## Integrate transactionally
 
 1. Generate and inspect the asset before editing code.

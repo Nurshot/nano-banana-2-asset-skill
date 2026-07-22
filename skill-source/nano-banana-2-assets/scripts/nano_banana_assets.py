@@ -102,6 +102,89 @@ def rate_limit_error(text: str) -> RateLimitError | None:
     )
 
 
+def default_runtime_state_dir() -> Path:
+    user_id = str(os.getuid()) if hasattr(os, "getuid") else "user"
+    return Path(tempfile.gettempdir()) / f"nano-banana-2-assets-{user_id}"
+
+
+def _format_wait(seconds: int) -> str:
+    if seconds >= 3600:
+        hours, remainder = divmod(seconds, 3600)
+        minutes = remainder // 60
+        return f"{hours}h {minutes}m" if minutes else f"{hours}h"
+    if seconds >= 60:
+        minutes, remainder = divmod(seconds, 60)
+        return f"{minutes}m {remainder}s" if remainder else f"{minutes}m"
+    return f"{seconds}s"
+
+
+def active_rate_limit(state_dir: Path, now: float | None = None) -> RateLimitError | None:
+    state_path = state_dir / "rate-limit.json"
+    try:
+        data = json.loads(state_path.read_text(encoding="utf-8"))
+        current = time.time() if now is None else now
+        remaining = math.ceil(float(data["until"]) - current)
+        if remaining <= 0:
+            state_path.unlink(missing_ok=True)
+            return None
+        hint = f"~{_format_wait(remaining)}"
+        return RateLimitError(
+            "Agy image-generation quota cooldown is still active; no request was sent and no files were changed."
+            f" Retry after approximately {hint}. Check Agy /usage (/quota) for the authoritative status.",
+            retry_after_seconds=remaining,
+            reset_hint=hint,
+            model=data.get("model"),
+        )
+    except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
+        return None
+
+
+def record_rate_limit(state_dir: Path, error: RateLimitError, now: float | None = None) -> None:
+    # If Agy omits a reset hint, use a short protective backoff to prevent a
+    # tight retry loop without pretending this is the real quota reset time.
+    cooldown_seconds = error.retry_after_seconds if error.retry_after_seconds and error.retry_after_seconds > 0 else 60
+    state_dir.mkdir(parents=True, exist_ok=True)
+    current = time.time() if now is None else now
+    state_path = state_dir / "rate-limit.json"
+    temp_path = state_dir / f".rate-limit-{os.getpid()}-{uuid.uuid4().hex}.tmp"
+    data = {"until": current + cooldown_seconds, "model": error.model}
+    try:
+        temp_path.write_text(json.dumps(data), encoding="utf-8")
+        os.replace(temp_path, state_path)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
+def acquire_generation_slot(state_dir: Path, wait_timeout: float, max_concurrent: int = 2,
+                            stale_after: float = 600) -> Path:
+    """Acquire one of two cross-process Agy slots without sending another request."""
+    if max_concurrent < 1 or wait_timeout < 0:
+        raise ValueError("Invalid generation slot settings")
+    state_dir.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + wait_timeout
+    while True:
+        for index in range(max_concurrent):
+            slot = state_dir / f"generation-{index}.lock"
+            try:
+                descriptor = os.open(slot, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                    handle.write(f"{os.getpid()}\n{time.time()}\n")
+                return slot
+            except FileExistsError:
+                try:
+                    if time.time() - slot.stat().st_mtime > stale_after:
+                        slot.unlink(missing_ok=True)
+                except OSError:
+                    pass
+        if time.monotonic() >= deadline:
+            raise AssetError("Two image generations are already running. No additional Agy request was sent; retry after one finishes.")
+        time.sleep(min(0.25, max(0.0, deadline - time.monotonic())))
+
+
+def release_generation_slot(slot: Path) -> None:
+    slot.unlink(missing_ok=True)
+
+
 def parse_slot(value: str) -> tuple[int, int]:
     match = re.fullmatch(r"\s*(\d+)\s*[xX×]\s*(\d+)\s*", value)
     if not match or int(match.group(1)) < 1 or int(match.group(2)) < 1:
@@ -283,6 +366,11 @@ def generate(args: argparse.Namespace) -> dict[str, object]:
         output = output.with_name(safe_name)
     if output.exists() and not args.overwrite:
         raise AssetError(f"Output already exists: {output}")
+    state_dir = (Path(args.runtime_state_dir).expanduser().resolve()
+                 if args.runtime_state_dir else default_runtime_state_dir())
+    cached_limit = active_rate_limit(state_dir)
+    if cached_limit:
+        raise cached_limit
     ratio = args.ratio
     if args.target_width and args.target_height:
         ratio = closest_native_ratio(args.target_width, args.target_height)
@@ -292,19 +380,27 @@ def generate(args: argparse.Namespace) -> dict[str, object]:
     # after the flag; trailing print-mode options are parsed separately by Agy.
     command = [args.agy, "--print", instruction, "--print-timeout", args.print_timeout]
     started_at = time.time()
+    slot = acquire_generation_slot(state_dir, args.slot_wait_timeout)
     try:
-        process = subprocess.run(command, capture_output=True, text=True, timeout=args.process_timeout, check=False)
-    except FileNotFoundError as exc:
-        raise AssetError("Agy is not installed or not on PATH. Install Google Antigravity CLI 1.1.5+ and complete OAuth login.") from exc
-    except subprocess.TimeoutExpired as exc:
-        raise AssetError(f"Agy timed out after {args.process_timeout} seconds; application code was not changed.") from exc
-    combined = "\n".join(value for value in (process.stdout, process.stderr) if value)
-    artifact = extract_artifact_path(combined, run_id)
-    roots = [Path(value).expanduser() for value in args.artifact_root] or None
-    artifact = artifact or (find_recent_artifact(run_id, started_at, roots) if process.returncode == 0 else None)
-    quota_error = rate_limit_error(combined)
-    if quota_error and not (process.returncode == 0 and artifact):
-        raise quota_error
+        cached_limit = active_rate_limit(state_dir)
+        if cached_limit:
+            raise cached_limit
+        try:
+            process = subprocess.run(command, capture_output=True, text=True, timeout=args.process_timeout, check=False)
+        except FileNotFoundError as exc:
+            raise AssetError("Agy is not installed or not on PATH. Install Google Antigravity CLI 1.1.5+ and complete OAuth login.") from exc
+        except subprocess.TimeoutExpired as exc:
+            raise AssetError(f"Agy timed out after {args.process_timeout} seconds; application code was not changed.") from exc
+        combined = "\n".join(value for value in (process.stdout, process.stderr) if value)
+        artifact = extract_artifact_path(combined, run_id)
+        roots = [Path(value).expanduser() for value in args.artifact_root] or None
+        artifact = artifact or (find_recent_artifact(run_id, started_at, roots) if process.returncode == 0 else None)
+        quota_error = rate_limit_error(combined)
+        if quota_error and not (process.returncode == 0 and artifact):
+            record_rate_limit(state_dir, quota_error)
+            raise quota_error
+    finally:
+        release_generation_slot(slot)
     if process.returncode != 0:
         lowered = combined.lower()
         if any(word in lowered for word in ("auth", "oauth", "login", "unauthorized")):
@@ -379,6 +475,8 @@ def parser() -> argparse.ArgumentParser:
     generate_cmd.add_argument("--print-timeout", default="5m")
     generate_cmd.add_argument("--process-timeout", type=int, default=330)
     generate_cmd.add_argument("--artifact-root", action="append", default=[])
+    generate_cmd.add_argument("--runtime-state-dir", help=argparse.SUPPRESS)
+    generate_cmd.add_argument("--slot-wait-timeout", type=float, default=330, help=argparse.SUPPRESS)
     return root
 
 

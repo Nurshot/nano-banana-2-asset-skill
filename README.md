@@ -58,7 +58,7 @@ Replace the placeholder in this product hero with a production-ready image.
 
 ## Quotas
 
-The runner detects `429 RESOURCE_EXHAUSTED` even when Agy exits successfully, returns a structured `rate_limit` error with the reported reset time, and leaves assets and application code unchanged. It never loops retries or waits for hours. Check current quota with Agy `/usage` or `/quota`; plan behavior is documented on [Antigravity Plans](https://antigravity.google/docs/plans).
+The runner detects `429 RESOURCE_EXHAUSTED` even when Agy exits successfully, returns a structured `rate_limit` error with the reported reset time, and leaves assets and application code unchanged. Reset times are dynamic—not fixed at three hours—and the reported cooldown prevents new requests until it expires. Multi-image work runs at most two generations concurrently and proceeds pair by pair. Check current quota with Agy `/usage` or `/quota`; plan behavior is documented on [Antigravity Plans](https://antigravity.google/docs/plans).
 
 ## Data and permissions
 

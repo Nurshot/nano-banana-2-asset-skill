@@ -14,3 +14,5 @@ Inspect the current web or mobile project and the target UI before designing the
 Route simple SVG icons, gradients, glows, shadows, charts, and code-native effects to native code without Agy. For photography, illustration, textures, complex raster effects, or bitmap edits, write the detailed English prompt, generate through Agy, inspect the result, and integrate it with accessible and responsive framework conventions.
 
 Do not modify application code unless generation succeeds. Never silently overwrite an existing asset. Run the relevant build or lint check and report the generated path, measured dimensions, integration point, and warnings.
+
+When the request needs multiple assets, generate at most two concurrently, wait for that pair, then continue with the next pair. Stop the batch immediately on a `rate_limit` result and honor its reported dynamic cooldown; do not assume a fixed reset duration.
