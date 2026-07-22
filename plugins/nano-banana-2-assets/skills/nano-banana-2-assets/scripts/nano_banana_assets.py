@@ -33,6 +33,75 @@ class AssetError(RuntimeError):
     pass
 
 
+class RateLimitError(AssetError):
+    """A retryable Agy quota failure, including zero-exit tool responses."""
+
+    def __init__(self, message: str, retry_after_seconds: int | None = None,
+                 reset_hint: str | None = None, model: str | None = None):
+        super().__init__(message)
+        self.retry_after_seconds = retry_after_seconds
+        self.reset_hint = reset_hint
+        self.model = model
+
+    def payload(self) -> dict[str, object]:
+        data: dict[str, object] = {
+            "ok": False,
+            "error_type": "rate_limit",
+            "retryable": True,
+            "error": str(self),
+            "action": "Retry after the reported reset or inspect Agy /usage (/quota). Automatic retry is disabled.",
+        }
+        if self.retry_after_seconds is not None:
+            data["retry_after_seconds"] = self.retry_after_seconds
+        if self.reset_hint:
+            data["reset_hint"] = self.reset_hint
+        if self.model:
+            data["model"] = self.model
+        return data
+
+
+def parse_retry_after_seconds(text: str) -> tuple[int | None, str | None]:
+    """Parse approximate reset hints such as 'resets in ~3 hours' or 'retry after 2h 15m'."""
+    trigger = re.search(r"(?:resets?\s+in|retry(?:\s+after)?|available\s+in)\s*([^\n.;]{1,80})", text, re.I)
+    if not trigger:
+        return None, None
+    hint = trigger.group(1).strip().rstrip(")]} ")
+    values = re.findall(
+        r"(\d+(?:\.\d+)?)\s*(hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)\b",
+        hint,
+        re.I,
+    )
+    if not values:
+        return None, hint or None
+    multiplier = {
+        "h": 3600, "hr": 3600, "hrs": 3600, "hour": 3600, "hours": 3600,
+        "m": 60, "min": 60, "mins": 60, "minute": 60, "minutes": 60,
+        "s": 1, "sec": 1, "secs": 1, "second": 1, "seconds": 1,
+    }
+    seconds = round(sum(float(value) * multiplier[unit.lower()] for value, unit in values))
+    return seconds, hint
+
+
+def rate_limit_error(text: str) -> RateLimitError | None:
+    lowered = text.lower()
+    markers = ("429", "resource_exhausted", "resource exhausted", "quota exhausted",
+               "quota limit", "rate quota", "rate limit reset")
+    if not any(marker in lowered for marker in markers):
+        return None
+    retry_after, reset_hint = parse_retry_after_seconds(text)
+    model_match = re.search(r"\bgemini-[a-z0-9.-]+", text, re.I)
+    model = model_match.group(0) if model_match else None
+    timing = f" Retry after approximately {reset_hint}." if reset_hint else " Retry after quota becomes available."
+    return RateLimitError(
+        "Agy image-generation quota is exhausted; no asset or application code was changed."
+        + timing
+        + " Check Agy /usage (/quota) for the authoritative status.",
+        retry_after_seconds=retry_after,
+        reset_hint=reset_hint,
+        model=model,
+    )
+
+
 def parse_slot(value: str) -> tuple[int, int]:
     match = re.fullmatch(r"\s*(\d+)\s*[xX×]\s*(\d+)\s*", value)
     if not match or int(match.group(1)) < 1 or int(match.group(2)) < 1:
@@ -230,18 +299,19 @@ def generate(args: argparse.Namespace) -> dict[str, object]:
     except subprocess.TimeoutExpired as exc:
         raise AssetError(f"Agy timed out after {args.process_timeout} seconds; application code was not changed.") from exc
     combined = "\n".join(value for value in (process.stdout, process.stderr) if value)
+    artifact = extract_artifact_path(combined, run_id)
+    roots = [Path(value).expanduser() for value in args.artifact_root] or None
+    artifact = artifact or (find_recent_artifact(run_id, started_at, roots) if process.returncode == 0 else None)
+    quota_error = rate_limit_error(combined)
+    if quota_error and not (process.returncode == 0 and artifact):
+        raise quota_error
     if process.returncode != 0:
         lowered = combined.lower()
         if any(word in lowered for word in ("auth", "oauth", "login", "unauthorized")):
             hint = "Agy authentication is required. Complete its local Google OAuth login and retry."
-        elif any(word in lowered for word in ("quota", "rate limit", "resource exhausted")):
-            hint = "Agy reported a quota or rate-limit error. Retry after quota is available."
         else:
             hint = combined.strip()[-1200:] or "No diagnostic output"
         raise AssetError(f"Agy failed (exit {process.returncode}): {hint}")
-    artifact = extract_artifact_path(combined, run_id)
-    roots = [Path(value).expanduser() for value in args.artifact_root] or None
-    artifact = artifact or find_recent_artifact(run_id, started_at, roots)
     if not artifact:
         lowered = combined.lower()
         if "permission" in lowered and any(marker in lowered for marker in ("auto-denied", "auto denied", "required the")):
@@ -331,8 +401,9 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0 if result.get("ok", True) else 1
     except (AssetError, OSError, ValueError) as exc:
-        print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
-        return 2
+        payload = exc.payload() if isinstance(exc, RateLimitError) else {"ok": False, "error": str(exc)}
+        print(json.dumps(payload, ensure_ascii=False), file=sys.stderr)
+        return 75 if isinstance(exc, RateLimitError) else 2
 
 
 if __name__ == "__main__":

@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 from pathlib import Path
 import stat
+import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -87,6 +90,14 @@ if mode == "auth":
     print("OAuth login required", file=sys.stderr); raise SystemExit(1)
 if mode == "quota":
     print("quota resource exhausted", file=sys.stderr); raise SystemExit(1)
+if mode == "quota-zero":
+    print("Waiting for rate limit reset...")
+    print("429 RESOURCE_EXHAUSTED: gemini-3.1-flash-image quota exhausted, resets in ~3 hours")
+    print("Had it succeeded: /tmp/" + run_id + ".png")
+    raise SystemExit(0)
+if mode == "quota-recovered":
+    print("Waiting for rate limit reset...")
+    print("Previous 429 RESOURCE_EXHAUSTED; retry succeeded")
 if mode == "missing":
     print("completed without an artifact"); raise SystemExit(0)
 if mode == "permission":
@@ -132,6 +143,43 @@ print(output)
             runner.generate(self.args(self.fake_agy("auth"), self.root / "auth.png"))
         with self.assertRaisesRegex(runner.AssetError, "quota"):
             runner.generate(self.args(self.fake_agy("quota"), self.root / "quota.png"))
+
+    def test_zero_exit_rate_limit_is_structured_and_does_not_create_output(self):
+        output = self.root / "quota-zero.png"
+        with self.assertRaises(runner.RateLimitError) as caught:
+            runner.generate(self.args(self.fake_agy("quota-zero"), output))
+        error = caught.exception
+        self.assertEqual(error.retry_after_seconds, 10800)
+        self.assertEqual(error.reset_hint, "~3 hours")
+        self.assertEqual(error.model, "gemini-3.1-flash-image")
+        self.assertEqual(error.payload()["error_type"], "rate_limit")
+        self.assertFalse(output.exists())
+
+    def test_cli_rate_limit_json_and_temporary_failure_exit_code(self):
+        output = self.root / "quota-cli.png"
+        process = subprocess.run(
+            [sys.executable, str(RUNNER_PATH), "generate", "--prompt", "test image",
+             "--output", str(output), "--project-root", str(self.root),
+             "--agy", str(self.fake_agy("quota-zero"))],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        payload = json.loads(process.stderr)
+        self.assertEqual(process.returncode, 75)
+        self.assertEqual(payload["error_type"], "rate_limit")
+        self.assertEqual(payload["retry_after_seconds"], 10800)
+        self.assertTrue(payload["retryable"])
+        self.assertFalse(output.exists())
+
+    def test_recovered_rate_limit_with_real_artifact_succeeds(self):
+        result = runner.generate(self.args(self.fake_agy("quota-recovered"), self.root / "recovered.png"))
+        self.assertEqual(result["width"], 800)
+        self.assertTrue((self.root / "recovered.png").exists())
+
+    def test_retry_hint_parser_supports_compound_and_short_units(self):
+        self.assertEqual(runner.parse_retry_after_seconds("retry after 2h 15m")[0], 8100)
+        self.assertEqual(runner.parse_retry_after_seconds("resets in 45 seconds")[0], 45)
 
     def test_headless_permission_error_is_actionable_and_safe(self):
         with self.assertRaisesRegex(runner.AssetError, "narrow command allow-rule"):

@@ -8,7 +8,7 @@
     {
       "name": "nano-banana-2-assets",
       "description": "Generate project-ready web and mobile visuals through Agy and integrate them into code.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "source": "./packages/claude/nano-banana-2-assets"
     }
   ]

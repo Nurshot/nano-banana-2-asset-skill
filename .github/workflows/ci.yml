@@ -19,5 +19,5 @@ jobs:
       - run: python3 scripts/build_release.py --check
       - name: Verify release archives
         run: |
-          test -f dist/nano-banana-2-assets-openai-0.1.0.zip
-          test -f dist/nano-banana-2-assets-claude-0.1.0.zip
+          test -f dist/nano-banana-2-assets-openai-0.1.1.zip
+          test -f dist/nano-banana-2-assets-claude-0.1.1.zip

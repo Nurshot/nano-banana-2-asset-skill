@@ -17,15 +17,15 @@ class ReleaseTests(unittest.TestCase):
         self.assertTrue(all(case["expected_skill"] for case in cases))
 
     def test_synced_packages_and_zip_shape(self):
-        subprocess.run([sys.executable, "scripts/build_release.py", "--version", "0.1.0"], cwd=ROOT, check=True, capture_output=True)
+        subprocess.run([sys.executable, "scripts/build_release.py", "--version", "0.1.1"], cwd=ROOT, check=True, capture_output=True)
         subprocess.run([sys.executable, "scripts/build_release.py", "--check"], cwd=ROOT, check=True, capture_output=True)
         marketplace = json.loads((ROOT / ".claude-plugin/marketplace.json").read_text(encoding="utf-8"))
-        self.assertEqual(marketplace["plugins"][0]["version"], "0.1.0")
+        self.assertEqual(marketplace["plugins"][0]["version"], "0.1.1")
         codex_marketplace = json.loads((ROOT / ".agents/plugins/marketplace.json").read_text(encoding="utf-8"))
         self.assertEqual(codex_marketplace["name"], "nano-banana-assets")
         self.assertEqual(codex_marketplace["plugins"][0]["source"]["path"], "./plugins/nano-banana-2-assets")
         for platform, manifest in (("openai", ".codex-plugin/plugin.json"), ("claude", ".claude-plugin/plugin.json")):
-            archive = ROOT / f"dist/nano-banana-2-assets-{platform}-0.1.0.zip"
+            archive = ROOT / f"dist/nano-banana-2-assets-{platform}-0.1.1.zip"
             self.assertLess(archive.stat().st_size, 100 * 1024 * 1024)
             with zipfile.ZipFile(archive) as zipped:
                 self.assertIn(manifest, zipped.namelist())

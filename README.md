@@ -13,6 +13,8 @@ It is also a visual router: photography, illustration, textures, and bitmap edit
 
 The skill does not use a Gemini API key, internal Google endpoint, or unsafe permission bypass. It does not verify the backend model. “Nano Banana 2” names the requested Agy image-generation route, not an independent provenance claim.
 
+> **Compatibility notice:** Google currently says that using third-party software—including Claude Code—with an Antigravity login may violate its terms. Review the [Antigravity FAQ](https://antigravity.google/docs/faq#why-cant-i-use-third-party-software-eg-claude-code-openclaw-opencode-with-my-antigravity-login) before use. This community plugin does not bypass authentication, permissions, credits, or quotas.
+
 ## Install
 
 ### Codex / ChatGPT desktop
@@ -53,6 +55,10 @@ Natural-language requests work too:
 ```text
 Replace the placeholder in this product hero with a production-ready image.
 ```
+
+## Quotas
+
+The runner detects `429 RESOURCE_EXHAUSTED` even when Agy exits successfully, returns a structured `rate_limit` error with the reported reset time, and leaves assets and application code unchanged. It never loops retries or waits for hours. Check current quota with Agy `/usage` or `/quota`; plan behavior is documented on [Antigravity Plans](https://antigravity.google/docs/plans).
 
 ## Data and permissions
 
