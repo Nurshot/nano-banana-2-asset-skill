@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.DS_Store
+.nano-banana/
+live-test-output/
+dist/
+docs/publishing/
+
+# Local research contains machine-specific paths and is not part of releases.
+ANTIGRAVITY_NANO_BANANA_2_ARASTIRMA_RAPORU.md

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Nano Banana 2 Assets"
+  short_description: "Generate project-ready app and web visuals"
+  default_prompt: "Use $nano-banana-2-assets to create and integrate the visual assets this project needs."
+policy:
+  allow_implicit_invocation: true

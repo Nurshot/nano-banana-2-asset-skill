@@ -1,0 +1,20 @@
+{
+  "name": "nano-banana-assets",
+  "interface": {
+    "displayName": "Nano Banana Assets"
+  },
+  "plugins": [
+    {
+      "name": "nano-banana-2-assets",
+      "source": {
+        "source": "local",
+        "path": "./plugins/nano-banana-2-assets"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

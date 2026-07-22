@@ -1,0 +1,19 @@
+{
+  "name": "nano-banana-2-assets",
+  "version": "0.1.0",
+  "description": "Proactively generate and integrate project-ready raster visuals through Google Antigravity Agy.",
+  "author": {
+    "name": "Nurshot",
+    "url": "https://github.com/Nurshot"
+  },
+  "homepage": "https://github.com/Nurshot/nano-banana-2-asset-skill",
+  "repository": "https://github.com/Nurshot/nano-banana-2-asset-skill",
+  "license": "MIT",
+  "keywords": [
+    "image-generation",
+    "nano-banana",
+    "antigravity",
+    "web-design",
+    "mobile-development"
+  ]
+}

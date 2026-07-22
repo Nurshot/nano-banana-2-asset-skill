@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "note": "Implicit invocation is model-based. These cases evaluate routing behavior, not a deterministic hook.",
+  "cases": [
+    {
+      "id": "implicit-nextjs-hero",
+      "prompt": "Build the landing page for this construction management product.",
+      "expected_skill": true,
+      "expected_agy": true,
+      "expectations": ["Agent identifies a meaningful hero image need", "Prompt leaves a safe-zone for HTML copy", "Application code changes only after generation succeeds"]
+    },
+    {
+      "id": "explicit-image",
+      "prompt": "Create a warm editorial team photograph for this About section and integrate it.",
+      "expected_skill": true,
+      "expected_agy": true,
+      "expectations": ["Skill is invoked directly", "UI text is not baked into the image", "Measured dimensions are reported"]
+    },
+    {
+      "id": "raster-effect",
+      "prompt": "Add a detailed smoky energy effect behind the game character.",
+      "expected_skill": true,
+      "expected_agy": true,
+      "expectations": ["Complex organic raster effect is generated", "Labels remain in code"]
+    },
+    {
+      "id": "placeholder",
+      "prompt": "Finish this page and replace anything that is still a placeholder.",
+      "fixture": "Page contains a prominent placeholder image slot.",
+      "expected_skill": true,
+      "expected_agy": true,
+      "expectations": ["Visible image placeholder triggers proactive asset generation"]
+    },
+    {
+      "id": "small-svg-icon",
+      "prompt": "Add a 16px chevron consistent with the existing icon set.",
+      "expected_skill": true,
+      "expected_agy": false,
+      "expectations": ["Visual router selects code-native SVG or existing icon system"]
+    },
+    {
+      "id": "css-gradient",
+      "prompt": "Add a subtle radial gradient and glow behind this card.",
+      "expected_skill": true,
+      "expected_agy": false,
+      "expectations": ["Visual router implements the effect with native styling"]
+    }
+  ]
+}

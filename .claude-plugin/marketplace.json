@@ -1,0 +1,15 @@
+{
+  "name": "nano-banana-assets",
+  "description": "Context-aware raster asset generation and code integration for web and mobile projects.",
+  "owner": {
+    "name": "Nurshot"
+  },
+  "plugins": [
+    {
+      "name": "nano-banana-2-assets",
+      "description": "Generate project-ready web and mobile visuals through Agy and integrate them into code.",
+      "version": "0.1.0",
+      "source": "./packages/claude/nano-banana-2-assets"
+    }
+  ]
+}

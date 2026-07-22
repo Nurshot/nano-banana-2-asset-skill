@@ -1,0 +1,42 @@
+{
+  "name": "nano-banana-2-assets",
+  "version": "0.1.0",
+  "description": "Proactively generate and integrate project-ready raster visuals through Google Antigravity Agy.",
+  "author": {
+    "name": "Nurshot",
+    "url": "https://github.com/Nurshot"
+  },
+  "homepage": "https://github.com/Nurshot/nano-banana-2-asset-skill",
+  "repository": "https://github.com/Nurshot/nano-banana-2-asset-skill",
+  "license": "MIT",
+  "keywords": [
+    "image-generation",
+    "nano-banana",
+    "antigravity",
+    "web-design",
+    "mobile-development"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Nano Banana 2 Assets",
+    "shortDescription": "Generate project-ready images",
+    "longDescription": "Reads web or mobile UI context, proactively decides when raster imagery is needed, designs responsive English prompts, generates through an existing local Agy OAuth session, and integrates the resulting asset into application code.",
+    "developerName": "Nurshot",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Local command execution",
+      "Project file access",
+      "Image generation",
+      "Code integration"
+    ],
+    "defaultPrompt": [
+      "Create and integrate the visuals this landing page needs.",
+      "Replace this app's image placeholders with production assets.",
+      "Design responsive hero art that leaves space for the UI copy."
+    ],
+    "brandColor": "#F5C542",
+    "websiteURL": "https://github.com/Nurshot/nano-banana-2-asset-skill",
+    "privacyPolicyURL": "https://github.com/Nurshot/nano-banana-2-asset-skill/blob/main/docs/PRIVACY.md",
+    "termsOfServiceURL": "https://github.com/Nurshot/nano-banana-2-asset-skill/blob/main/docs/TERMS.md"
+  }
+}
