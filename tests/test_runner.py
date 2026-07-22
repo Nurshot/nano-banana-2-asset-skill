@@ -188,6 +188,13 @@ print(output)
         self.assertEqual(runner.parse_retry_after_seconds("retry after 2h 15m")[0], 8100)
         self.assertEqual(runner.parse_retry_after_seconds("resets in 45 seconds")[0], 45)
         self.assertEqual(runner.parse_retry_after_seconds("resets in ~4 hours")[0], 14400)
+        actual_error = (
+            "You have exhausted your capacity on this model. "
+            "Your quota will reset after 2h51m24s."
+        )
+        seconds, hint = runner.parse_retry_after_seconds(actual_error)
+        self.assertEqual(seconds, 10284)
+        self.assertEqual(hint, "2h51m24s")
 
     def test_runtime_cooldown_uses_dynamic_duration_and_expires(self):
         state = self.root / "cooldown-state"

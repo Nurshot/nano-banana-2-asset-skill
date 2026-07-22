@@ -104,7 +104,7 @@ def build_zip(platform: str, plugin_root: Path, version: str, output_dir: Path) 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", default="0.1.1")
+    parser.add_argument("--version", default="0.1.2")
     parser.add_argument("--check", action="store_true", help="Only verify package copies match the canonical skill")
     args = parser.parse_args(argv)
     for root in PACKAGES.values():

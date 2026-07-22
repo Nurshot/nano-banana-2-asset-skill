@@ -61,13 +61,18 @@ class RateLimitError(AssetError):
 
 
 def parse_retry_after_seconds(text: str) -> tuple[int | None, str | None]:
-    """Parse approximate reset hints such as 'resets in ~3 hours' or 'retry after 2h 15m'."""
-    trigger = re.search(r"(?:resets?\s+in|retry(?:\s+after)?|available\s+in)\s*([^\n.;]{1,80})", text, re.I)
+    """Parse reset hints such as 'resets in ~3 hours' or 'will reset after 2h51m24s'."""
+    trigger = re.search(
+        r"(?:resets?\s+in|(?:will\s+)?resets?\s+after|retry(?:\s+after)?|available\s+in)"
+        r"\s*([^\n.;]{1,80})",
+        text,
+        re.I,
+    )
     if not trigger:
         return None, None
     hint = trigger.group(1).strip().rstrip(")]} ")
     values = re.findall(
-        r"(\d+(?:\.\d+)?)\s*(hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)\b",
+        r"(\d+(?:\.\d+)?)\s*(hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)(?![A-Za-z])",
         hint,
         re.I,
     )
