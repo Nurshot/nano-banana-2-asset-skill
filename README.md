@@ -4,6 +4,8 @@
 
 It is also a visual router: photography, illustration, textures, and bitmap edits go to Agy; SVG icons, simple gradients, glows, shadows, charts, and code-native effects stay in code.
 
+The skill / plugin does not use a Gemini API key. It uses your existing Google OAuth session through the Antigravity CLI (agy), so usage is subject to your Antigravity plan’s quotas and rate limits. OAuth tokens are handled by agy; the plugin itself never reads or stores them.
+
 ## Requirements
 
 - Google Antigravity CLI (`agy`) 1.1.5 or newer
@@ -11,7 +13,7 @@ It is also a visual router: photography, illustration, textures, and bitmap edit
 - Python 3
 - Local command execution and project-file access
 
-The skill does not use a Gemini API key, internal Google endpoint, or unsafe permission bypass. It does not verify the backend model. “Nano Banana 2” names the requested Agy image-generation route, not an independent provenance claim.
+ It does not verify the backend model. “Nano Banana 2” names the requested Agy image-generation route, not an independent provenance claim.
 
 > **Compatibility notice:** Google currently says that using third-party software—including Claude Code—with an Antigravity login may violate its terms. Review the [Antigravity FAQ](https://antigravity.google/docs/faq#why-cant-i-use-third-party-software-eg-claude-code-openclaw-opencode-with-my-antigravity-login) before use. This community plugin does not bypass authentication, permissions, credits, or quotas.
 
